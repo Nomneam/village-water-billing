@@ -1,10 +1,13 @@
 from fastapi import FastAPI
+import secrets
+
+# Import the login router
+from app.api.login import router as login_router
 
 app = FastAPI()
 
-@app.get("/")
-async def root():
-    return {"message": "Hello World"}
+# Include the login router
+app.include_router(login_router)
 
 if __name__ == "__main__":
     import uvicorn
