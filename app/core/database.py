@@ -7,12 +7,14 @@ load_dotenv()
 def get_db_connection():
     return pymysql.connect(
         host=os.getenv("DB_HOST"),
-        port=int(os.getenv("DB_PORT", 3306)),
+        port=int(os.getenv("DB_PORT") or 3306),
         user=os.getenv("DB_USER"),
         password=os.getenv("DB_PASSWORD"),
         database=os.getenv("DB_NAME"),
+        charset="utf8mb4",
         cursorclass=pymysql.cursors.DictCursor,
-        connect_timeout=10
+        connect_timeout=10,
+        autocommit=True
     )
 # กัน DB ล่มเวลา traffic เยอะ ใน Project มีขนาดใหญ่ แนะนำใช้ Connection Pooling
 # pool = PooledDB(
