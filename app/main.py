@@ -3,11 +3,15 @@ import secrets
 
 # Import the login router
 from app.api.login import router as login_router
+from app.api.user_management import router as user_management_router
 
 app = FastAPI()
 
 # Include the login router
 app.include_router(login_router)
+
+# Include the user management router
+app.include_router(user_management_router)
 
 if __name__ == "__main__":
     import uvicorn
