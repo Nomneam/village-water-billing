@@ -19,7 +19,7 @@ async def login(login_data: Login):
         cursor.execute(
             """
             SELECT username, password_hash, role, full_name
-            FROM admins
+            FROM employees
             WHERE username = %s
             """,
             (login_data.username,)
