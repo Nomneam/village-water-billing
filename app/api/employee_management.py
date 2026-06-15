@@ -4,6 +4,7 @@ from app.core.jwt import get_current_user
 from app.core.security import hash_password
 from app.schemas.basemoel_employee import EmployeeCreateRequest
 from app.services.utils import generate_employee_code
+from app.services.duplicatecheck_emp import check_employee_duplicate
 import pymysql
 
 router = APIRouter()
@@ -87,7 +88,20 @@ async def create_employee(
     cursor = conn.cursor()
 
     try:
-        # 1. insert employee
+
+        # =========================
+        # 0. CHECK DUPLICATE (FROM FUNCTION)
+        # =========================
+        check_employee_duplicate(
+            cursor,
+            data.username,
+            data.email,
+            data.phone
+        )
+
+        # =========================
+        # 1. INSERT EMPLOYEE
+        # =========================
         cursor.execute("""
             INSERT INTO employees (
                 username,
@@ -100,17 +114,21 @@ async def create_employee(
             VALUES (%s, %s, %s, %s, NOW(), NOW())
         """, (
             data.username,
-            hash_password(data.password),   
+            hash_password(data.password),
             data.full_name,
             data.role
         ))
 
         emp_id = cursor.lastrowid
 
-        # 2. AUTO employee_code
+        # =========================
+        # 2. GENERATE EMPLOYEE CODE
+        # =========================
         employee_code = generate_employee_code(cursor)
 
-        # 3. insert profile
+        # =========================
+        # 3. INSERT PROFILE
+        # =========================
         cursor.execute("""
             INSERT INTO employee_profiles (
                 employee_id,
@@ -140,6 +158,10 @@ async def create_employee(
             "emp_id": emp_id,
             "employee_code": employee_code
         }
+
+    except HTTPException as e:
+        conn.rollback()
+        raise e
 
     except Exception as e:
         conn.rollback()
