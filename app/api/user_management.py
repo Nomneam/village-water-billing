@@ -37,6 +37,7 @@ async def get_users(
         cursor.execute("""
             SELECT
                 user_id,
+                citizen_id,
                 line_user_id,
                 full_name,
                 phone,

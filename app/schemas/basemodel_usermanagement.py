@@ -23,6 +23,7 @@ class UserCreate(BaseModel):
         return value
 class UserResponse(BaseModel):
     user_id: int
+    citizen_id: str | None = None
     line_user_id: str | None = None
     full_name: str
     phone: str | None = None
