@@ -67,6 +67,7 @@ async def get_village(
         cursor.close()
         conn.close()
 
+        
 # เพิ่มบ้านใหม่
 @router.post("/village", status_code=status.HTTP_201_CREATED)
 async def create_house(
@@ -95,7 +96,7 @@ async def create_house(
                 detail="User not found"
             )
 
-        # ตรวจสอบ village_id
+        # ตรวจสอบ village_id และดึง village_code
         cursor.execute("""
             SELECT village_code
             FROM villages
@@ -129,18 +130,7 @@ async def create_house(
                 detail="House number already exists in this village"
             )
 
-        # สร้าง meter_number อัตโนมัติ
-        cursor.execute("""
-            SELECT COUNT(*) AS total
-            FROM houses
-            WHERE village_id = %s
-        """, (house.village_id,))
-
-        running = cursor.fetchone()["total"] + 1
-
-        meter_number = f"{village_code}-{running:05d}"
-
-        # เพิ่มข้อมูลบ้าน
+        # เพิ่มข้อมูลบ้าน (meter_number เป็น NULL ชั่วคราว)
         cursor.execute("""
             INSERT INTO houses (
                 village_id,
@@ -152,17 +142,30 @@ async def create_house(
                 created_at,
                 updated_at
             )
-            VALUES (%s, %s, %s, %s, %s, %s, NOW(), NOW())
+            VALUES (%s, %s, %s, NULL, %s, %s, NOW(), NOW())
         """, (
             house.village_id,
             house.user_id,
             house.house_no,
-            meter_number,
             house.address,
             house.status
         ))
 
+        # รับ house_id ที่ถูกสร้าง
         house_id = cursor.lastrowid
+
+        # สร้างเลขมิเตอร์
+        meter_number = f"{village_code}-{house_id:06d}"
+
+        # อัปเดตเลขมิเตอร์กลับเข้าไป
+        cursor.execute("""
+            UPDATE houses
+            SET meter_number = %s
+            WHERE house_id = %s
+        """, (
+            meter_number,
+            house_id
+        ))
 
         conn.commit()
 
@@ -183,11 +186,11 @@ async def create_house(
             detail="Database error"
         )
 
-    except Exception:
+    except Exception as e:
         conn.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Internal server error"
+            detail=str(e)
         )
 
     finally:
