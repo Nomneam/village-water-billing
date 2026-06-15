@@ -1,6 +1,10 @@
 from fastapi import APIRouter, HTTPException ,Depends , Query ,status
 from app.core.database import get_db_connection
 from app.core.jwt import get_current_user
+from app.core.security import hash_password
+from app.schemas.basemoel_employee import EmployeeCreateRequest
+from app.services.utils import generate_employee_code
+import pymysql
 
 router = APIRouter()
 
@@ -11,7 +15,6 @@ async def get_employees(
     limit: int = Query(20, ge=1, le=100),
     current_user: dict = Depends(get_current_user)
 ):
-    # permission
     if current_user.get("role") != "SUPER_ADMIN":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -24,11 +27,11 @@ async def get_employees(
     cursor = conn.cursor()
 
     try:
-        # count
+        # total
         cursor.execute("SELECT COUNT(*) AS total FROM employees")
         total = cursor.fetchone()["total"]
 
-        # data + join profile
+        # data
         cursor.execute("""
             SELECT
                 e.emp_id,
@@ -41,10 +44,8 @@ async def get_employees(
                 p.email,
                 p.address,
                 p.profile_image,
-                p.status AS profile_status,
+                p.status AS profile_status
 
-                e.created_at,
-                e.updated_at
             FROM employees e
             LEFT JOIN employee_profiles p
                 ON e.emp_id = p.employee_id
@@ -67,6 +68,82 @@ async def get_employees(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error fetching employees: {str(e)}"
         )
+
+    finally:
+        cursor.close()
+        conn.close()
+
+
+# สร้างพนักงานใหม่
+@router.post("/employees/create")
+async def create_employee(
+    data: EmployeeCreateRequest,
+    current_user: dict = Depends(get_current_user)
+):
+    if current_user.get("role") != "SUPER_ADMIN":
+        raise HTTPException(status_code=403, detail="Permission denied")
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    try:
+        # 1. insert employee
+        cursor.execute("""
+            INSERT INTO employees (
+                username,
+                password_hash,
+                full_name,
+                role,
+                created_at,
+                updated_at
+            )
+            VALUES (%s, %s, %s, %s, NOW(), NOW())
+        """, (
+            data.username,
+            hash_password(data.password),   
+            data.full_name,
+            data.role
+        ))
+
+        emp_id = cursor.lastrowid
+
+        # 2. AUTO employee_code
+        employee_code = generate_employee_code(cursor)
+
+        # 3. insert profile
+        cursor.execute("""
+            INSERT INTO employee_profiles (
+                employee_id,
+                employee_code,
+                phone,
+                email,
+                address,
+                profile_image,
+                status,
+                created_at,
+                updated_at
+            )
+            VALUES (%s, %s, %s, %s, %s, %s, 'ACTIVE', NOW(), NOW())
+        """, (
+            emp_id,
+            employee_code,
+            data.phone,
+            data.email,
+            data.address,
+            data.profile_image
+        ))
+
+        conn.commit()
+
+        return {
+            "message": "Employee created successfully",
+            "emp_id": emp_id,
+            "employee_code": employee_code
+        }
+
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
 
     finally:
         cursor.close()
