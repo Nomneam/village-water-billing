@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException ,Depends , Query ,status
 from app.core.database import get_db_connection
 from app.core.jwt import get_current_user
-from app.schemas.basemodel_usermanagement import UserResponse, UserListResponse, HouseResponse ,UserCreate , UserPaginationResponse
+from app.schemas.basemodel_usermanagement import UserCreate , UserPaginationResponse
 
 
 router = APIRouter()
@@ -37,6 +37,7 @@ async def get_users(
         cursor.execute("""
             SELECT
                 user_id,
+                citizen_id,
                 line_user_id,
                 full_name,
                 phone,
@@ -84,6 +85,18 @@ async def create_user(
     cursor = conn.cursor()
 
     try:
+        # ตรวจสอบเลขบัตรประชาชนซ้ำ
+        cursor.execute(
+            "SELECT user_id FROM users WHERE citizen_id = %s",
+            (user.citizen_id,)
+        )
+
+        if cursor.fetchone():
+            raise HTTPException(
+                status_code=409,
+                detail="Citizen ID already exists"
+            )
+
         # ตรวจสอบ email ซ้ำ
         if user.email:
             cursor.execute(
@@ -110,15 +123,31 @@ async def create_user(
                     detail="LINE User ID already exists"
                 )
 
+        # ตรวจสอบเบอร์โทรซ้ำ (ถ้าต้องการ)
+        cursor.execute(
+            "SELECT user_id FROM users WHERE phone = %s",
+            (user.phone,)
+        )
+
+        if cursor.fetchone():
+            raise HTTPException(
+                status_code=409,
+                detail="Phone number already exists"
+            )
+
         cursor.execute("""
             INSERT INTO users (
+                citizen_id,
                 line_user_id,
                 full_name,
                 phone,
-                email
+                email,
+                created_at,
+                updated_at
             )
-            VALUES (%s, %s, %s, %s)
+            VALUES (%s, %s, %s, %s, %s, NOW(), NOW())
         """, (
+            user.citizen_id,
             user.line_user_id,
             user.full_name,
             user.phone,
