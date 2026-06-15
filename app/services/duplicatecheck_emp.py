@@ -1,5 +1,5 @@
 from fastapi import  HTTPException
-from http.client import HTTPException
+
 
 
 def check_employee_duplicate(cursor, username: str, email: str, phone: str):
