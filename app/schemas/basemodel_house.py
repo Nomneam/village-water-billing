@@ -3,8 +3,8 @@ from typing import Optional, Literal
 
 
 class HouseCreate(BaseModel):
-    user_id: Optional[int] = None
+    village_id: int
+    user_id: int
     house_no: str
-    meter_number: str
     address: str
     status: Literal["ACTIVE", "INACTIVE"] = "ACTIVE"

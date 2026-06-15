@@ -84,45 +84,66 @@ async def create_house(
 
     try:
         # ตรวจสอบ user_id
-        if house.user_id is not None:
-            cursor.execute(
-                "SELECT user_id FROM users WHERE user_id = %s",
-                (house.user_id,)
+        cursor.execute(
+            "SELECT user_id FROM users WHERE user_id = %s",
+            (house.user_id,)
+        )
+
+        if cursor.fetchone() is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User not found"
             )
 
-            if cursor.fetchone() is None:
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail="User not found"
-                )
+        # ตรวจสอบ village_id
+        cursor.execute("""
+            SELECT village_code
+            FROM villages
+            WHERE village_id = %s
+        """, (house.village_id,))
 
-        # ตรวจสอบบ้านเลขที่ซ้ำ
-        cursor.execute(
-            "SELECT house_id FROM houses WHERE house_no = %s",
-            (house.house_no,)
-        )
+        village = cursor.fetchone()
+
+        if village is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Village not found"
+            )
+
+        village_code = village["village_code"]
+
+        # ตรวจสอบบ้านเลขที่ซ้ำในหมู่บ้านเดียวกัน
+        cursor.execute("""
+            SELECT house_id
+            FROM houses
+            WHERE village_id = %s
+              AND house_no = %s
+        """, (
+            house.village_id,
+            house.house_no
+        ))
 
         if cursor.fetchone():
             raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="House number already exists"
+                status_code=status.HTTP_409_CONFLICT,
+                detail="House number already exists in this village"
             )
 
-        # ตรวจสอบเลขมิเตอร์ซ้ำ
-        cursor.execute(
-            "SELECT house_id FROM houses WHERE meter_number = %s",
-            (house.meter_number,)
-        )
+        # สร้าง meter_number อัตโนมัติ
+        cursor.execute("""
+            SELECT COUNT(*) AS total
+            FROM houses
+            WHERE village_id = %s
+        """, (house.village_id,))
 
-        if cursor.fetchone():
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Meter number already exists"
-            )
+        running = cursor.fetchone()["total"] + 1
+
+        meter_number = f"{village_code}-{running:05d}"
 
         # เพิ่มข้อมูลบ้าน
         cursor.execute("""
             INSERT INTO houses (
+                village_id,
                 user_id,
                 house_no,
                 meter_number,
@@ -131,23 +152,28 @@ async def create_house(
                 created_at,
                 updated_at
             )
-            VALUES (%s, %s, %s, %s, %s, NOW(), NOW())
+            VALUES (%s, %s, %s, %s, %s, %s, NOW(), NOW())
         """, (
+            house.village_id,
             house.user_id,
             house.house_no,
-            house.meter_number,
+            meter_number,
             house.address,
             house.status
         ))
+
+        house_id = cursor.lastrowid
 
         conn.commit()
 
         return {
             "message": "House created successfully",
-            "house_id": cursor.lastrowid
+            "house_id": house_id,
+            "meter_number": meter_number
         }
 
     except HTTPException:
+        conn.rollback()
         raise
 
     except pymysql.MySQLError:
@@ -167,4 +193,3 @@ async def create_house(
     finally:
         cursor.close()
         conn.close()
-
