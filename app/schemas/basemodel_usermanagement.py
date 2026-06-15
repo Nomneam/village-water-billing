@@ -1,16 +1,26 @@
 # app/schemas/user.py
 
-from datetime import datetime
-from pydantic import BaseModel, EmailStr
-from typing import Literal
+from pydantic import BaseModel, EmailStr, Field, field_validator
 
 
+# เพิ่มข้อมูลผู้ใช้งานใหม่
 class UserCreate(BaseModel):
-    line_user_id: str
+    citizen_id: str = Field(..., min_length=13, max_length=13)
+    line_user_id: str | None = None
     full_name: str
     phone: str | None = None
-    email: str | None = None
+    email: EmailStr | None = None
 
+    @field_validator("citizen_id")
+    @classmethod
+    def validate_citizen_id(cls, value: str):
+        if not value.isdigit():
+            raise ValueError("Citizen ID must contain only digits")
+
+        if len(value) != 13:
+            raise ValueError("Citizen ID must be 13 digits")
+
+        return value
 class UserResponse(BaseModel):
     user_id: int
     line_user_id: str | None = None
@@ -29,12 +39,3 @@ class UserPaginationResponse(BaseModel):
     total_pages: int
     users: list[UserResponse]
 
-# เลขที่บ้าน
-class HouseResponse(BaseModel):
-    house_id: int
-    user_id: int
-    house_no: str
-    address: str | None = None
-    status: Literal["ACTIVE", "INACTIVE"]
-    created_at: datetime
-    updated_at: datetime
