@@ -36,6 +36,7 @@ async def get_village(
                 h.house_no,
                 h.address,
                 h.status,
+                h.meter_number,
                 h.user_id,
                 u.full_name,
                 u.phone,
@@ -67,7 +68,7 @@ async def get_village(
         cursor.close()
         conn.close()
 
-        
+
 # เพิ่มบ้านใหม่
 @router.post("/village", status_code=status.HTTP_201_CREATED)
 async def create_house(
