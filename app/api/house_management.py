@@ -7,8 +7,8 @@ import pymysql
 router = APIRouter()
 
 # แสดงข้อมูลลูบ้าน
-@router.get("/village")
-async def get_village(
+@router.get("/houses")
+async def get_houses(
     page: int = Query(1, ge=1),
     limit: int = Query(20, ge=1, le=100),
     current_user: dict = Depends(get_current_user)
@@ -70,7 +70,7 @@ async def get_village(
 
 
 # เพิ่มบ้านใหม่
-@router.post("/village", status_code=status.HTTP_201_CREATED)
+@router.post("/houses/create", status_code=status.HTTP_201_CREATED)
 async def create_house(
     house: HouseCreate,
     current_user: dict = Depends(get_current_user)
@@ -201,7 +201,7 @@ async def create_house(
 
 
 # อัปเดตบ้าน (แก้ไขเฉพาะ user_id กับ status)
-@router.put("/houses/{house_id}")
+@router.put("/houses/update/{house_id}")
 async def update_house(
     house_id: int,
     house: HouseUpdate,
