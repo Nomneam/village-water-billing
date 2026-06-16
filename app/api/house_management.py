@@ -1,14 +1,14 @@
 from fastapi import APIRouter, HTTPException, Depends, Query, status
 from app.core.database import get_db_connection
 from app.core.jwt import get_current_user
-from app.schemas.basemodel_house import HouseCreate
+from app.schemas.basemodel_house import HouseCreate ,HouseUpdate
 import pymysql
 
 router = APIRouter()
 
 # แสดงข้อมูลลูบ้าน
-@router.get("/village")
-async def get_village(
+@router.get("/houses")
+async def get_houses(
     page: int = Query(1, ge=1),
     limit: int = Query(20, ge=1, le=100),
     current_user: dict = Depends(get_current_user)
@@ -70,7 +70,7 @@ async def get_village(
 
 
 # เพิ่มบ้านใหม่
-@router.post("/village", status_code=status.HTTP_201_CREATED)
+@router.post("/houses/create", status_code=status.HTTP_201_CREATED)
 async def create_house(
     house: HouseCreate,
     current_user: dict = Depends(get_current_user)
@@ -192,6 +192,113 @@ async def create_house(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=str(e)
+        )
+
+    finally:
+        cursor.close()
+        conn.close()
+
+
+
+# อัปเดตบ้าน (แก้ไขเฉพาะ user_id กับ status)
+@router.put("/houses/update/{house_id}")
+async def update_house(
+    house_id: int,
+    house: HouseUpdate,
+    current_user: dict = Depends(get_current_user)
+):
+    if current_user.get("role") not in ["SUPER_ADMIN", "STAFF"]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Permission denied"
+        )
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    try:
+        # ดึงข้อมูลบ้านเดิม
+        cursor.execute("""
+            SELECT
+                house_id,
+                user_id,
+                status
+            FROM houses
+            WHERE house_id = %s
+        """, (house_id,))
+
+        existing_house = cursor.fetchone()
+
+        if existing_house is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="House not found"
+            )
+
+        # ใช้ค่าเดิมถ้าไม่ได้ส่งมา
+        updated_user_id = (
+            house.user_id
+            if house.user_id is not None
+            else existing_house["user_id"]
+        )
+
+        updated_status = (
+            house.status
+            if house.status is not None
+            else existing_house["status"]
+        )
+
+        # ตรวจสอบ user_id
+        cursor.execute(
+            "SELECT user_id FROM users WHERE user_id = %s",
+            (updated_user_id,)
+        )
+
+        if cursor.fetchone() is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User not found"
+            )
+
+        # อัปเดตข้อมูล
+        cursor.execute("""
+            UPDATE houses
+            SET
+                user_id = %s,
+                status = %s,
+                updated_at = NOW()
+            WHERE house_id = %s
+        """, (
+            updated_user_id,
+            updated_status,
+            house_id
+        ))
+
+        conn.commit()
+
+        return {
+            "message": "House updated successfully",
+            "house_id": house_id,
+            "user_id": updated_user_id,
+            "status": updated_status
+        }
+
+    except HTTPException:
+        conn.rollback()
+        raise
+
+    except pymysql.MySQLError:
+        conn.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Database error"
+        )
+
+    except Exception:
+        conn.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Internal server error"
         )
 
     finally:

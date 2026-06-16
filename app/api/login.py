@@ -18,7 +18,7 @@ async def login(login_data: Login):
     try:
         cursor.execute(
             """
-            SELECT username, password_hash, role, full_name
+            SELECT emp_id, username, password_hash, role, full_name
             FROM employees
             WHERE username = %s
             """,
@@ -34,6 +34,7 @@ async def login(login_data: Login):
             raise HTTPException(status_code=401, detail="Invalid username or password")
 
         payload = {
+            "emp_id": user["emp_id"],
             "sub": user["username"],
             "role": user["role"]
         }
@@ -70,6 +71,7 @@ async def refresh_token(data: RefreshRequest):
             raise HTTPException(status_code=401, detail="Invalid token type")
 
         new_access_token = create_access_token({
+            "emp_id": payload["emp_id"],
             "sub": payload["sub"],
             "role": payload["role"]
         })
