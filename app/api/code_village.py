@@ -199,6 +199,8 @@ async def create_house(
         conn.close()
 
 
+
+# อัปเดตบ้าน (แก้ไขเฉพาะ user_id กับ status)
 @router.put("/houses/{house_id}")
 async def update_house(
     house_id: int,
