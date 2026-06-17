@@ -7,6 +7,7 @@ from app.api.user_management import router as user_management_router
 from app.api.house_management import router as house_management_router
 from app.api.employee_management import router as employee_management_router
 from app.api.village_management import router as village_management_router
+from app.api.set_waterreate  import router as set_waterrate_router
 
 app = FastAPI()
 
@@ -20,6 +21,8 @@ app.include_router(user_management_router)
 app.include_router(employee_management_router)
 # Include the village management router
 app.include_router(village_management_router)
+# include the set water rate router
+app.include_router(set_waterrate_router)
 
 if __name__ == "__main__":
     import uvicorn
