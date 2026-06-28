@@ -223,6 +223,48 @@ async def update_village(
         conn.close()
 
 
+# ดรอปดาวหมู่บ้าน (ใช้ใน select option)
+@router.get("/villages/dropdown")
+async def get_village_dropdown(
+    current_user: dict = Depends(get_current_user)
+):
+    if current_user.get("role") not in ["SUPER_ADMIN"]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Permission denied"
+        )
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute("""
+            SELECT
+                village_id,
+                village_name
+            FROM villages
+            ORDER BY village_name ASC
+        """)
+
+        villages = cursor.fetchall()
+
+        return {
+            "villages": villages
+        }
+
+    except Exception as e:
+        print(e)
+        raise HTTPException(
+            status_code=500,
+            detail="Internal server error"
+        )
+
+    finally:
+        cursor.close()
+        conn.close()
+
+
+
 # ลบหมู่บ้าน
 @router.delete("/villages/delete/{village_id}")
 async def delete_village(
